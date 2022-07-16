@@ -68,6 +68,17 @@ namespace BytesStream {
     signal?: AbortSignal;
   };
 
+  /**
+   * The [`ReadableStream`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream) of `Uint8Array` or the async iterator of `Uint8Array`.
+   *
+   * @experimental
+   */
+  export type Source =
+    | AsyncIterable<Uint8Array>
+    | ReadableStream<Uint8Array>
+    | Iterable<Uint8Array>;
+  // XXX ReadableStream<Uint8Array>は、そのうちAsyncIterable<Uint8Array>になる
+
   export class Reader extends EventTarget {
     #readyState: _ReaderReadyState;
     #loadedByteLength: int;
@@ -111,13 +122,7 @@ namespace BytesStream {
       this.dispatchEvent(event);
     }
 
-    async read(
-      stream:
-        | AsyncIterable<Uint8Array>
-        | ReadableStream<Uint8Array>
-        | Iterable<Uint8Array>,
-      options?: ReadingOptions,
-    ): Promise<Uint8Array> {
+    async read(stream: Source, options?: ReadingOptions): Promise<Uint8Array> {
       if (stream && (typeof stream === "object")) {
         if (
           Reflect.has(stream, Symbol.asyncIterator) ||
