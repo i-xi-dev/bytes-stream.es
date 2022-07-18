@@ -35,13 +35,66 @@ async function* _streamToAsyncGenerator<T>(
   }
 }
 
-const _ReaderReadyState = {
-  EMPTY: 0,
-  LOADING: 1,
-  DONE: 2,
-} as const;
-type _ReaderReadyState =
-  typeof _ReaderReadyState[keyof typeof _ReaderReadyState];
+// /**
+//  * @experimental
+//  */
+// interface Task<T> {
+//   state: Task.State;
+//   progress: Task.Progress;
+//   run: () => Promise<T>;
+//   onstatechange?: () => void;
+//   onprogress?: () => void;
+// }
+
+/**
+ * @experimental
+ */
+namespace Task {
+  export const State = {
+    READY: Symbol(),
+    RUNNING: Symbol(),
+    COMPLETED: Symbol(),
+    ABORTED: Symbol(),
+    ERROR: Symbol(),
+  } as const;
+  export type State = typeof State[keyof typeof State];
+
+  export type Progress = {
+    loaded: int;
+    total: int;
+    lengthComputable: boolean;
+  };
+}
+
+// const _ReaderReadyState = {
+//   EMPTY: 0,
+//   LOADING: 1,
+//   DONE: 2,
+// } as const;
+// type _ReaderReadyState =
+//   typeof _ReaderReadyState[keyof typeof _ReaderReadyState];
+
+// function _translateState(state: Task.State): _ReaderReadyState {
+//   switch (state) {
+//     case Task.State.READY:
+//       return _ReaderReadyState.EMPTY;
+//     case Task.State.RUNNING:
+//       return _ReaderReadyState.LOADING;
+//     case Task.State.COMPLETED:
+//     case Task.State.ABORTED:
+//     case Task.State.ERROR:
+//       return _ReaderReadyState.DONE;
+//     default:
+//       throw new TypeError("state");
+//   }
+// }
+
+/**
+ * @internal
+ */
+type _ProgressChangeListener =
+  | ((event: ProgressEvent) => void)
+  | undefined;
 
 /**
  * @experimental
@@ -79,111 +132,158 @@ namespace BytesStream {
     | Iterable<Uint8Array>;
   // XXX ReadableStream<Uint8Array>は、そのうちAsyncIterable<Uint8Array>になる
 
-  export class Reader extends EventTarget {
-    #readyState: _ReaderReadyState;
-    #loadedByteLength: int;
-    #totalByteLength: int | undefined;
-    #abortController: AbortController;
-    #lastProgressNotifiedAt: number;
+  type _Internal = {
+    state: Task.State;
+    loadedByteLength: int;
+    lastProgressNotifiedAt: number;
+    onprogress: _ProgressChangeListener;
+  };
 
-    constructor() {
-      super();
-      this.#readyState = _ReaderReadyState.EMPTY;
-      this.#loadedByteLength = 0;
-      this.#totalByteLength = undefined;
-      this.#abortController = new AbortController();
-      this.#lastProgressNotifiedAt = Number.MIN_VALUE;
-      Object.seal(this);
-    }
+  export class ReadingTask /* extends EventTarget implements Task<Uint8Array> */ {
+    #stream: Source;
+    #totalByteLength: int;
+    #indeterminate: boolean;
+    #signal: AbortSignal | undefined;
+    // #abortController: AbortController;
+    #progress: Task.Progress;
+    #internal: _Internal;
 
-    // XXX 要るか？
-    // get readyState(): _ReaderReadyState {
-    //   return this.#readyState;
-    // }
-
-    get #indeterminate(): boolean {
-      return ((typeof this.#totalByteLength === "number") !== true);
-    }
-
-    #notify(name: string): void {
-      if (name === "progress") {
-        const now = performance.now();
-        if ((this.#lastProgressNotifiedAt + 50) > now) {
-          return;
-        }
-        this.#lastProgressNotifiedAt = now;
-      }
-
-      const event = new _ProgressEvent(name, {
-        lengthComputable: (this.#indeterminate !== true),
-        loaded: this.#loadedByteLength,
-        total: this.#totalByteLength, // undefinedの場合ProgressEvent側で0となる
-      });
-      this.dispatchEvent(event);
-    }
-
-    async read(stream: Source, options?: ReadingOptions): Promise<Uint8Array> {
+    private constructor(stream: Source, options?: ReadingOptions) {
       if (stream && (typeof stream === "object")) {
-        if (
-          Reflect.has(stream, Symbol.asyncIterator) ||
-          Reflect.has(stream, Symbol.iterator)
-        ) {
-          try {
-            const result = await this.#readAsyncIterable(
-              stream as AsyncIterable<Uint8Array>,
-              options,
-            );
-            return result;
-          } catch (exception) {
-            if (stream instanceof ReadableStream) {
-              stream.cancel();
-            }
-            throw exception;
-          }
-        } else if (stream instanceof ReadableStream) {
-          // ReadableStreamに[Symbol.asyncIterator]が未実装の場合
-          const reader: ReadableStreamDefaultReader<Uint8Array> = stream
-            .getReader();
-          try {
-            const result = await this.#readAsyncIterable(
-              _streamToAsyncGenerator<Uint8Array>(reader),
-              options,
-            );
-            return result;
-          } catch (exception) {
-            reader.cancel();
-            throw exception;
-          }
-        }
+        // ok
+      } else {
+        throw new TypeError("stream");
       }
-      throw new TypeError("stream");
-    }
 
-    async #readAsyncIterable(
-      asyncSource: AsyncIterable<Uint8Array>,
-      options?: ReadingOptions,
-    ): Promise<Uint8Array> {
-      if (this.#readyState !== _ReaderReadyState.EMPTY) {
-        throw new InvalidStateError(`readyState: ${this.#readyState}`);
-      }
-      this.#readyState = _ReaderReadyState.LOADING;
+      // super();
+      this.#stream = stream;
 
       const totalByteLength: number | undefined = options?.totalByteLength;
       if (typeof totalByteLength === "number") {
         if (Integer.isNonNegativeInteger(totalByteLength) !== true) {
           throw new RangeError("options.totalByteLength");
         }
-        this.#totalByteLength = totalByteLength;
       } else if (totalByteLength === undefined) {
         // ok
       } else {
         throw new TypeError("options.totalByteLength");
       }
+      this.#totalByteLength = totalByteLength ?? 0;
+      this.#indeterminate = typeof totalByteLength !== "number";
+      // this.#abortController = new AbortController();
+      this.#signal = options?.signal;
 
-      const signal = options?.signal;
-      if (signal instanceof AbortSignal) {
+      // deno-lint-ignore no-this-alias
+      const self = this;
+      this.#progress = Object.freeze({
+        get loaded() {
+          return self.#internal.loadedByteLength;
+        },
+        get total() {
+          return self.#totalByteLength;
+        },
+        get lengthComputable() {
+          return (self.#indeterminate !== true);
+        },
+      });
+
+      this.#internal = Object.seal({
+        state: Task.State.READY,
+        loadedByteLength: 0,
+        lastProgressNotifiedAt: Number.MIN_VALUE,
+        onprogress: undefined,
+      });
+      Object.freeze(this);
+    }
+
+    static create(stream: Source, options?: ReadingOptions): ReadingTask {
+      return new ReadingTask(stream, options);
+    }
+
+    get state(): Task.State {
+      return this.#internal.state;
+    }
+
+    get progress(): Task.Progress {
+      return this.#progress;
+    }
+
+    // XXX 要るか？
+    // get readyState(): _ReaderReadyState {
+    //   return _translateState(this.#internal.state);
+    // }
+
+    set onprogress(value: _ProgressChangeListener) {
+      this.#internal.onprogress = value;
+    }
+
+    #onprogress(progress: ProgressEvent): void {
+      if (typeof this.#internal.onprogress !== "function") {
+        return;
+      }
+      this.#internal.onprogress(progress);
+    }
+
+    #notify(name: string): void {
+      if (name === "progress") {
+        const now = performance.now();
+        if ((this.#internal.lastProgressNotifiedAt + 50) > now) {
+          return;
+        }
+        this.#internal.lastProgressNotifiedAt = now;
+      }
+
+      const event = new _ProgressEvent(name, this.progress);
+      if (name === "progress") {
+        this.#onprogress(event);
+      }
+      // this.dispatchEvent(event);
+    }
+
+    async run(): Promise<Uint8Array> {
+      if (
+        Reflect.has(this.#stream, Symbol.asyncIterator) ||
+        Reflect.has(this.#stream, Symbol.iterator)
+      ) {
+        try {
+          const result = await this.#readAsyncIterable(
+            this.#stream as AsyncIterable<Uint8Array>,
+          );
+          return result;
+        } catch (exception) {
+          if (this.#stream instanceof ReadableStream) {
+            this.#stream.cancel();
+          }
+          throw exception;
+        }
+      } else if (this.#stream instanceof ReadableStream) {
+        // ReadableStreamに[Symbol.asyncIterator]が未実装の場合
+        const reader = this.#stream.getReader();
+        try {
+          const result = await this.#readAsyncIterable(
+            _streamToAsyncGenerator<Uint8Array>(reader),
+          );
+          return result;
+        } catch (exception) {
+          reader.cancel();
+          throw exception;
+        }
+      } else {
+        throw new TypeError("#stream");
+      }
+    }
+
+    async #readAsyncIterable(
+      asyncSource: AsyncIterable<Uint8Array>,
+    ): Promise<Uint8Array> {
+      if (this.#internal.state !== Task.State.READY) {
+        throw new InvalidStateError(`state is not READY`);
+      }
+      this.#internal.state = Task.State.RUNNING;
+
+      if (this.#signal instanceof AbortSignal) {
         // // ストリームの最後の読み取りがキューされるまでに中止通達されれば中断する
-        // signal.addEventListener("abort", () => {
+        // this.#signal.addEventListener("abort", () => {
         //   stream.cancel()しても読取終了まで待ちになるので、reader.cancel()する
         //   void reader.cancel().catch(); // XXX closeで良い？ // → ループ内で中断判定するので何もしない
         // }, {
@@ -192,31 +292,33 @@ namespace BytesStream {
         //   signal: this.#abortController.signal,
         // });
 
-        // 既に中止通達されている場合はエラーとする
-        if (signal.aborted === true) {
-          throw new AbortError("already aborted"); // TODO signal.reasonが広く実装されたら、signal.reasonをthrowするようにする
+        // 既に中止通達されている場合はエラーとする //TODO this.#signal.throwIfAborted
+        if (this.#signal.aborted === true) {
+          throw new AbortError("already aborted"); // TODO this.#signal.reasonが広く実装されたら、signal.reasonをthrowするようにする
         }
-      } else if (signal === undefined) {
+      } else if (this.#signal === undefined) {
         // ok
       } else {
         throw new TypeError("options.signal");
       }
 
-      const buffer: _BytesBuffer = new _BytesBuffer(this.#totalByteLength);
+      const buffer: _BytesBuffer = new _BytesBuffer(
+        (this.#indeterminate === true) ? undefined : this.#totalByteLength,
+      );
 
       try {
         // started
-        this.#notify("loadstart");
+        this.#notify("loadstart"); //XXX 不要では
 
         for await (const chunk of asyncSource) {
-          if (signal?.aborted === true) {
+          if (this.#signal?.aborted === true) {
             // aborted or expired
-            throw new AbortError("aborted"); // TODO signal.reasonが広く実装されたら、signal.reasonをthrowするようにする
+            throw new AbortError("aborted"); // TODO this.#signal.reasonが広く実装されたら、signal.reasonをthrowするようにする
           }
 
           if (chunk instanceof Uint8Array) {
             buffer.put(chunk);
-            this.#loadedByteLength = buffer.position;
+            this.#internal.loadedByteLength = buffer.position;
             this.#notify("progress");
           } else {
             throw new TypeError("asyncSource");
@@ -224,7 +326,8 @@ namespace BytesStream {
         }
 
         // completed
-        this.#notify("load");
+        this.#internal.state = Task.State.COMPLETED;
+        // this.#notify("load"); resolveされるのでわかる
 
         if (buffer.capacity !== buffer.position) {
           return buffer.slice();
@@ -235,29 +338,31 @@ namespace BytesStream {
         if ((exception instanceof Error) && (exception.name === "AbortError")) {
           // ・呼び出し側のAbortControllerでreason省略でabortした場合
           // ・呼び出し側のAbortControllerでreason:AbortErrorでabortした場合
-          this.#notify("abort");
+          this.#internal.state = Task.State.ABORTED;
+          // this.#notify("abort"); rejectされるのでわかる
         } else if (
           (exception instanceof Error) && (exception.name === "TimeoutError")
         ) {
           // ・AbortSignal.timeoutでabortされた場合
           // ・呼び出し側のAbortControllerでreason:TimeoutErrorでabortした場合
-          this.#notify("timeout");
+          this.#internal.state = Task.State.ABORTED; //TODO timeout独自のstateにする？
+          // this.#notify("timeout"); rejectされるのでわかる
         } else {
           // ・呼び出し側のAbortControllerでreason:AbortError,TimeoutError以外でabortした場合
           // ・その他のエラー
-          this.#notify("error");
+          this.#internal.state = Task.State.ERROR;
+          // this.#notify("error"); rejectされるのでわかる
         }
         throw exception;
       } finally {
-        // signalに追加したリスナーを削除
-        this.#abortController.abort();
+        // // signalに追加したリスナーを削除
+        // this.#abortController.abort();
 
-        this.#readyState = _ReaderReadyState.DONE;
-        this.#notify("loadend");
+        this.#notify("loadend"); //XXX 不要では
       }
     }
   }
-  Object.seal(Reader);
+  Object.freeze(ReadingTask);
 }
 Object.freeze(BytesStream);
 

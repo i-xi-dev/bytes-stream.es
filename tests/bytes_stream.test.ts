@@ -32,51 +32,52 @@ function createStream(length: number) {
   });
 }
 
-Deno.test("BytesStream.Reader.prototype.read(ReadableStream)", async () => {
+Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream)", async () => {
   const s1 = createStream(8);
 
-  const reader1 = new BytesStream.Reader();
-  const bs1 = await reader1.read(s1);
+  const task1 = BytesStream.ReadingTask.create(s1);
+  const bs1 = await task1.run();
 
   assertStrictEquals(bs1.byteLength, 8);
 
-  const s2 = createStream(8);
   try {
-    await reader1.read(s2);
+    await task1.run();
     throw new Error();
   } catch (e) {
     const err = e as Error;
     assertStrictEquals(err.name, "InvalidStateError");
-    assertStrictEquals(err.message, "readyState: 2");
+    assertStrictEquals(err.message, "state is not READY");
   }
 });
 
-Deno.test("BytesStream.Reader.prototype.read(AsyncIterable<Uint8Array>)", async () => {
-  const reader1 = new BytesStream.Reader();
+Deno.test("BytesStream.ReadingTask.prototype.read(AsyncIterable<Uint8Array>)", async () => {
   const ai1 = async function* () {
     yield Uint8Array.of(1);
     yield Uint8Array.of(2, 3);
   };
-  const bs1 = await reader1.read(ai1());
+  const task1 = BytesStream.ReadingTask.create(ai1());
+  const bs1 = await task1.run();
   assertStrictEquals(bs1.byteLength, 3);
 
-  const reader2 = new BytesStream.Reader();
   // deno-lint-ignore require-yield
-  const ai2 = async function* () {
+  const ai2 = async function* (): AsyncGenerator<Uint8Array, void, void> {
     return;
   };
-  const bs2 = await reader2.read(ai2());
+  const reader2 = BytesStream.ReadingTask.create(ai2());
+  const bs2 = await reader2.run();
   assertStrictEquals(bs2.byteLength, 0);
 });
 
-Deno.test("BytesStream.Reader.prototype.read(AsyncIterable<*>)", async () => {
-  const reader1 = new BytesStream.Reader();
+Deno.test("BytesStream.ReadingTask.prototype.read(AsyncIterable<*>)", async () => {
   const ai1 = async function* () {
     yield 1;
     yield 2;
   };
+  const task1 = BytesStream.ReadingTask.create(
+    ai1() as unknown as AsyncIterable<Uint8Array>,
+  );
   try {
-    await reader1.read(ai1() as unknown as AsyncIterable<Uint8Array>);
+    await task1.run();
     throw new Error();
   } catch (e) {
     const err = e as Error;
@@ -85,10 +86,12 @@ Deno.test("BytesStream.Reader.prototype.read(AsyncIterable<*>)", async () => {
   }
 });
 
-Deno.test("BytesStream.Reader.prototype.read(*)", async () => {
-  const reader1 = new BytesStream.Reader();
+Deno.test("BytesStream.ReadingTask.prototype.read(*)", async () => {
   try {
-    await reader1.read(3 as unknown as AsyncIterable<Uint8Array>);
+    const task1 = BytesStream.ReadingTask.create(
+      3 as unknown as AsyncIterable<Uint8Array>,
+    );
+    await task1.run();
     throw new Error();
   } catch (e) {
     const err = e as Error;
@@ -97,20 +100,25 @@ Deno.test("BytesStream.Reader.prototype.read(*)", async () => {
   }
 });
 
-Deno.test("BytesStream.Reader.prototype.read(Iterable<Uint8Array>)", async () => {
-  const reader1 = new BytesStream.Reader();
-  const bs1 = await reader1.read([Uint8Array.of(1), Uint8Array.of(2, 3)]);
+Deno.test("BytesStream.ReadingTask.prototype.read(Iterable<Uint8Array>)", async () => {
+  const task1 = BytesStream.ReadingTask.create([
+    Uint8Array.of(1),
+    Uint8Array.of(2, 3),
+  ]);
+  const bs1 = await task1.run();
   assertStrictEquals(bs1.byteLength, 3);
 
-  const reader2 = new BytesStream.Reader();
-  const bs2 = await reader2.read([]);
+  const reader2 = BytesStream.ReadingTask.create([] as Uint8Array[]);
+  const bs2 = await reader2.run();
   assertStrictEquals(bs2.byteLength, 0);
 });
 
-Deno.test("BytesStream.Reader.prototype.read(Iterable<*>)", async () => {
-  const reader1 = new BytesStream.Reader();
+Deno.test("BytesStream.ReadingTask.prototype.read(Iterable<*>)", async () => {
   try {
-    await reader1.read([3] as unknown as Iterable<Uint8Array>);
+    const task1 = BytesStream.ReadingTask.create(
+      [3] as unknown as Iterable<Uint8Array>,
+    );
+    await task1.run();
     throw new Error();
   } catch (e) {
     const err = e as Error;
@@ -119,43 +127,44 @@ Deno.test("BytesStream.Reader.prototype.read(Iterable<*>)", async () => {
   }
 });
 
-Deno.test("BytesStream.Reader.prototype.read(ReadableStream, {totalByteLength: number})", async () => {
+Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream, {totalByteLength: number})", async () => {
   const s1 = createStream(8);
-  const reader1 = new BytesStream.Reader();
-  const bs1 = await reader1.read(s1, { totalByteLength: 8 });
+  const task1 = BytesStream.ReadingTask.create(s1, { totalByteLength: 8 });
+  const bs1 = await task1.run();
   assertStrictEquals(bs1.byteLength, 8);
   assertStrictEquals(bs1.buffer.byteLength, 8);
 
   const s2 = createStream(8);
-  const reader2 = new BytesStream.Reader();
-  const bs2 = await reader2.read(s2, { totalByteLength: 9 });
+  const reader2 = BytesStream.ReadingTask.create(s2, { totalByteLength: 9 });
+  const bs2 = await reader2.run();
   assertStrictEquals(bs2.byteLength, 8);
   assertStrictEquals(bs2.buffer.byteLength, 8);
 
   const s3 = createStream(8);
-  const reader3 = new BytesStream.Reader();
-  const bs3 = await reader3.read(s3, { totalByteLength: 7 });
+  const reader3 = BytesStream.ReadingTask.create(s3, { totalByteLength: 7 });
+  const bs3 = await reader3.run();
   assertStrictEquals(bs3.byteLength, 8);
   assertStrictEquals(bs3.buffer.byteLength, 8);
 
   const s4 = createStream(8);
-  const reader4 = new BytesStream.Reader();
-  const bs4 = await reader4.read(s4, { totalByteLength: 0 });
+  const reader4 = BytesStream.ReadingTask.create(s4, { totalByteLength: 0 });
+  const bs4 = await reader4.run();
   assertStrictEquals(bs4.byteLength, 8);
   assertStrictEquals(bs4.buffer.byteLength, 8);
 
   const s5 = createStream(8);
-  const reader5 = new BytesStream.Reader();
-  const bs5 = await reader5.read(s5, { totalByteLength: undefined });
+  const reader5 = BytesStream.ReadingTask.create(s5, {
+    totalByteLength: undefined,
+  });
+  const bs5 = await reader5.run();
   assertStrictEquals(bs5.byteLength, 8);
   assertStrictEquals(bs5.buffer.byteLength, 8);
 });
 
-Deno.test("BytesStream.Reader.prototype.read(ReadableStream, {totalByteLength:number}) - error", async () => {
-  const s1 = createStream(15);
-  const reader1 = new BytesStream.Reader();
+Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream, {totalByteLength:number}) - error", async () => {
   try {
-    await reader1.read(s1, { totalByteLength: -1 });
+    const task1 = BytesStream.ReadingTask.create([], { totalByteLength: -1 });
+    await task1.run();
     throw new Error();
   } catch (e) {
     const err = e as Error;
@@ -163,10 +172,11 @@ Deno.test("BytesStream.Reader.prototype.read(ReadableStream, {totalByteLength:nu
     assertStrictEquals(err.message, "options.totalByteLength");
   }
 
-  const s2 = createStream(15);
-  const reader2 = new BytesStream.Reader();
   try {
-    await reader2.read(s2, { totalByteLength: "1" as unknown as number });
+    const reader2 = BytesStream.ReadingTask.create([], {
+      totalByteLength: "1" as unknown as number,
+    });
+    await reader2.run();
     throw new Error();
   } catch (e) {
     const err = e as Error;
@@ -175,15 +185,15 @@ Deno.test("BytesStream.Reader.prototype.read(ReadableStream, {totalByteLength:nu
   }
 });
 
-Deno.test("BytesStream.Reader.prototype.read(ReadableStream, {signal:AbortSignal})", async () => {
+Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream, {signal:AbortSignal})", async () => {
   const s1 = createStream(100);
-  const reader1 = new BytesStream.Reader();
   const ac1 = new AbortController();
-  setTimeout(() => {
-    ac1.abort();
-  }, 5);
   try {
-    await reader1.read(s1, { signal: ac1.signal });
+    const task1 = BytesStream.ReadingTask.create(s1, { signal: ac1.signal });
+    setTimeout(() => {
+      ac1.abort();
+    }, 5);
+    await task1.run();
     throw new Error();
   } catch (e) {
     const err = e as Error;
@@ -191,11 +201,13 @@ Deno.test("BytesStream.Reader.prototype.read(ReadableStream, {signal:AbortSignal
   }
 });
 
-Deno.test("BytesStream.Reader.prototype.read(ReadableStream, {signal:AbortSignal}) - error", async () => {
+Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream, {signal:AbortSignal}) - error", async () => {
   const s2 = createStream(100);
-  const reader2 = new BytesStream.Reader();
   try {
-    await reader2.read(s2, { signal: {} as unknown as AbortSignal });
+    const reader2 = BytesStream.ReadingTask.create(s2, {
+      signal: {} as unknown as AbortSignal,
+    });
+    await reader2.run();
     throw new Error();
   } catch (e) {
     const err = e as Error;
@@ -203,13 +215,13 @@ Deno.test("BytesStream.Reader.prototype.read(ReadableStream, {signal:AbortSignal
   }
 });
 
-Deno.test("BytesStream.Reader.prototype.read(ReadableStream, {signal:AbortSignal}) - error", async () => {
+Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream, {signal:AbortSignal}) - error", async () => {
   const s2 = createStream(100);
-  const reader2 = new BytesStream.Reader();
   const ac2 = new AbortController();
   ac2.abort();
   try {
-    await reader2.read(s2, { signal: ac2.signal });
+    const reader2 = BytesStream.ReadingTask.create(s2, { signal: ac2.signal });
+    await reader2.run();
     throw new Error();
   } catch (e) {
     const err = e as Error;
@@ -218,9 +230,9 @@ Deno.test("BytesStream.Reader.prototype.read(ReadableStream, {signal:AbortSignal
   }
 });
 
-Deno.test("BytesStream.Reader.prototype.read(ReadableStream)/addEventListener()", async () => {
+Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream)/addEventListener()", async () => {
   const s1 = createStream(8);
-  const reader1 = new BytesStream.Reader();
+  const task1 = BytesStream.ReadingTask.create(s1);
 
   let loadedLength = -1;
   let totalLength = -1;
@@ -233,31 +245,32 @@ Deno.test("BytesStream.Reader.prototype.read(ReadableStream)/addEventListener()"
     lengthComputable = e.lengthComputable;
   };
 
-  reader1.addEventListener("loadstart", listener as EventListener);
-  reader1.addEventListener("load", listener as EventListener);
-  reader1.addEventListener("progress", listener as EventListener);
-  reader1.addEventListener("abort", listener as EventListener);
-  reader1.addEventListener("timeout", listener as EventListener);
-  reader1.addEventListener("error", listener as EventListener);
-  reader1.addEventListener("loadend", listener as EventListener);
+  // task1.addEventListener("loadstart", listener as EventListener);
+  // task1.addEventListener("load", listener as EventListener);
+  // task1.addEventListener("progress", listener as EventListener);
+  // task1.addEventListener("abort", listener as EventListener);
+  // task1.addEventListener("timeout", listener as EventListener);
+  // task1.addEventListener("error", listener as EventListener);
+  // task1.addEventListener("loadend", listener as EventListener);
+  task1.onprogress = listener;
 
-  const bs1 = await reader1.read(s1);
+  const bs1 = await task1.run();
   assertStrictEquals(bs1.byteLength, 8);
   assertStrictEquals(loadedLength, 8);
   assertStrictEquals(totalLength, 0);
   assertStrictEquals(lengthComputable, false);
-  assertStrictEquals(names.filter((n) => n === "loadstart").length, 1);
-  assertStrictEquals(names.filter((n) => n === "load").length, 1);
+  // assertStrictEquals(names.filter((n) => n === "loadstart").length, 1);
+  // assertStrictEquals(names.filter((n) => n === "load").length, 1);
   assertStrictEquals(names.filter((n) => n === "progress").length >= 1, true);
-  assertStrictEquals(names.filter((n) => n === "abort").length, 0);
-  assertStrictEquals(names.filter((n) => n === "timeout").length, 0);
-  assertStrictEquals(names.filter((n) => n === "error").length, 0);
-  assertStrictEquals(names.filter((n) => n === "loadend").length, 1);
+  // assertStrictEquals(names.filter((n) => n === "abort").length, 0);
+  // assertStrictEquals(names.filter((n) => n === "timeout").length, 0);
+  // assertStrictEquals(names.filter((n) => n === "error").length, 0);
+  // assertStrictEquals(names.filter((n) => n === "loadend").length, 1);
 });
 
-Deno.test("BytesStream.Reader.prototype.read(ReadableStream)/addEventListener() - total", async () => {
+Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream)/addEventListener() - total", async () => {
   const s1 = createStream(8);
-  const reader1 = new BytesStream.Reader();
+  const task1 = BytesStream.ReadingTask.create(s1, { totalByteLength: 200 });
 
   let loadedLength = -1;
   let totalLength = -1;
@@ -270,31 +283,33 @@ Deno.test("BytesStream.Reader.prototype.read(ReadableStream)/addEventListener() 
     lengthComputable = e.lengthComputable;
   };
 
-  reader1.addEventListener("loadstart", listener as EventListener);
-  reader1.addEventListener("load", listener as EventListener);
-  reader1.addEventListener("progress", listener as EventListener);
-  reader1.addEventListener("abort", listener as EventListener);
-  reader1.addEventListener("timeout", listener as EventListener);
-  reader1.addEventListener("error", listener as EventListener);
-  reader1.addEventListener("loadend", listener as EventListener);
+  // task1.addEventListener("loadstart", listener as EventListener);
+  // task1.addEventListener("load", listener as EventListener);
+  // task1.addEventListener("progress", listener as EventListener);
+  // task1.addEventListener("abort", listener as EventListener);
+  // task1.addEventListener("timeout", listener as EventListener);
+  // task1.addEventListener("error", listener as EventListener);
+  // task1.addEventListener("loadend", listener as EventListener);
+  task1.onprogress = listener;
 
-  const bs1 = await reader1.read(s1, { totalByteLength: 200 });
+  const bs1 = await task1.run();
   assertStrictEquals(bs1.byteLength, 8);
   assertStrictEquals(loadedLength, 8);
   assertStrictEquals(totalLength, 200);
   assertStrictEquals(lengthComputable, true);
-  assertStrictEquals(names.filter((n) => n === "loadstart").length, 1);
-  assertStrictEquals(names.filter((n) => n === "load").length, 1);
+  // assertStrictEquals(names.filter((n) => n === "loadstart").length, 1);
+  // assertStrictEquals(names.filter((n) => n === "load").length, 1);
   assertStrictEquals(names.filter((n) => n === "progress").length >= 1, true);
-  assertStrictEquals(names.filter((n) => n === "abort").length, 0);
-  assertStrictEquals(names.filter((n) => n === "timeout").length, 0);
-  assertStrictEquals(names.filter((n) => n === "error").length, 0);
-  assertStrictEquals(names.filter((n) => n === "loadend").length, 1);
+  // assertStrictEquals(names.filter((n) => n === "abort").length, 0);
+  // assertStrictEquals(names.filter((n) => n === "timeout").length, 0);
+  // assertStrictEquals(names.filter((n) => n === "error").length, 0);
+  // assertStrictEquals(names.filter((n) => n === "loadend").length, 1);
 });
 
-Deno.test("BytesStream.Reader.prototype.read(ReadableStream)/addEventListener() - abort", async () => {
+Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream)/addEventListener() - abort", async () => {
   const s1 = createStream(8);
-  const reader1 = new BytesStream.Reader();
+  const ac1 = new AbortController();
+  const task1 = BytesStream.ReadingTask.create(s1, { signal: ac1.signal });
   let loadedLength = -1;
   let totalLength = -1;
   let lengthComputable = undefined;
@@ -306,20 +321,20 @@ Deno.test("BytesStream.Reader.prototype.read(ReadableStream)/addEventListener() 
     lengthComputable = e.lengthComputable;
   };
 
-  reader1.addEventListener("loadstart", listener as EventListener);
-  reader1.addEventListener("load", listener as EventListener);
-  reader1.addEventListener("progress", listener as EventListener);
-  reader1.addEventListener("abort", listener as EventListener);
-  reader1.addEventListener("timeout", listener as EventListener);
-  reader1.addEventListener("error", listener as EventListener);
-  reader1.addEventListener("loadend", listener as EventListener);
+  // task1.addEventListener("loadstart", listener as EventListener);
+  // task1.addEventListener("load", listener as EventListener);
+  // task1.addEventListener("progress", listener as EventListener);
+  // task1.addEventListener("abort", listener as EventListener);
+  // task1.addEventListener("timeout", listener as EventListener);
+  // task1.addEventListener("error", listener as EventListener);
+  // task1.addEventListener("loadend", listener as EventListener);
+  task1.onprogress = listener;
 
-  const ac1 = new AbortController();
   setTimeout(() => {
     ac1.abort();
   }, 20);
   try {
-    await reader1.read(s1, { signal: ac1.signal });
+    await task1.run();
     throw new Error();
   } catch (ex) {
     void ex;
@@ -328,13 +343,13 @@ Deno.test("BytesStream.Reader.prototype.read(ReadableStream)/addEventListener() 
   assertStrictEquals(loadedLength >= 1, true);
   assertStrictEquals(totalLength, 0);
   assertStrictEquals(lengthComputable, false);
-  assertStrictEquals(names.filter((n) => n === "loadstart").length, 1);
-  assertStrictEquals(names.filter((n) => n === "load").length, 0);
+  // assertStrictEquals(names.filter((n) => n === "loadstart").length, 1);
+  // assertStrictEquals(names.filter((n) => n === "load").length, 0);
   assertStrictEquals(names.filter((n) => n === "progress").length >= 1, true);
-  assertStrictEquals(names.filter((n) => n === "abort").length, 1);
-  assertStrictEquals(names.filter((n) => n === "timeout").length, 0);
-  assertStrictEquals(names.filter((n) => n === "error").length, 0);
-  assertStrictEquals(names.filter((n) => n === "loadend").length, 1);
+  // assertStrictEquals(names.filter((n) => n === "abort").length, 1);
+  // assertStrictEquals(names.filter((n) => n === "timeout").length, 0);
+  // assertStrictEquals(names.filter((n) => n === "error").length, 0);
+  // assertStrictEquals(names.filter((n) => n === "loadend").length, 1);
 });
 
 //TODO "error"
