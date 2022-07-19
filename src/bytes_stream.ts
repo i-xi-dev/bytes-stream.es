@@ -51,11 +51,11 @@ async function* _streamToAsyncGenerator<T>(
  */
 namespace Task {
   export const State = {
-    READY: Symbol(),
-    RUNNING: Symbol(),
-    COMPLETED: Symbol(),
-    ABORTED: Symbol(),
-    ERROR: Symbol(),
+    READY: "ready",
+    RUNNING: "running",
+    COMPLETED: "completed",
+    ABORTED: "aborted",
+    ERROR: "error",
   } as const;
   export type State = typeof State[keyof typeof State];
 
@@ -96,6 +96,13 @@ type _ProgressChangeListener =
   | ((event: ProgressEvent) => void)
   | undefined;
 
+type _Internal = {
+  state: Task.State;
+  loadedByteLength: int;
+  lastProgressNotifiedAt: number;
+  onprogress: _ProgressChangeListener;
+};
+
 /**
  * @experimental
  */
@@ -132,13 +139,9 @@ namespace BytesStream {
     | Iterable<Uint8Array>;
   // XXX ReadableStream<Uint8Array>は、そのうちAsyncIterable<Uint8Array>になる
 
-  type _Internal = {
-    state: Task.State;
-    loadedByteLength: int;
-    lastProgressNotifiedAt: number;
-    onprogress: _ProgressChangeListener;
-  };
-
+  /**
+   * @experimental
+   */
   export class ReadingTask /* extends EventTarget implements Task<Uint8Array> */ {
     #stream: Source;
     #totalByteLength: int;
@@ -226,7 +229,7 @@ namespace BytesStream {
 
     #notify(name: string): void {
       if (name === "progress") {
-        const now = performance.now();
+        const now = globalThis.performance.now();
         if ((this.#internal.lastProgressNotifiedAt + 50) > now) {
           return;
         }

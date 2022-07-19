@@ -32,7 +32,7 @@ function createStream(length: number) {
   });
 }
 
-Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream)", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream)", async () => {
   const s1 = createStream(8);
 
   const task1 = BytesStream.ReadingTask.create(s1);
@@ -50,7 +50,7 @@ Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream)", async () => 
   }
 });
 
-Deno.test("BytesStream.ReadingTask.prototype.read(AsyncIterable<Uint8Array>)", async () => {
+Deno.test("new BytesStream.ReadingTask(AsyncIterable<Uint8Array>)", async () => {
   const ai1 = async function* () {
     yield Uint8Array.of(1);
     yield Uint8Array.of(2, 3);
@@ -68,7 +68,7 @@ Deno.test("BytesStream.ReadingTask.prototype.read(AsyncIterable<Uint8Array>)", a
   assertStrictEquals(bs2.byteLength, 0);
 });
 
-Deno.test("BytesStream.ReadingTask.prototype.read(AsyncIterable<*>)", async () => {
+Deno.test("new BytesStream.ReadingTask(AsyncIterable<*>)", async () => {
   const ai1 = async function* () {
     yield 1;
     yield 2;
@@ -86,7 +86,7 @@ Deno.test("BytesStream.ReadingTask.prototype.read(AsyncIterable<*>)", async () =
   }
 });
 
-Deno.test("BytesStream.ReadingTask.prototype.read(*)", async () => {
+Deno.test("new BytesStream.ReadingTask(*)", async () => {
   try {
     const task1 = BytesStream.ReadingTask.create(
       3 as unknown as AsyncIterable<Uint8Array>,
@@ -100,7 +100,7 @@ Deno.test("BytesStream.ReadingTask.prototype.read(*)", async () => {
   }
 });
 
-Deno.test("BytesStream.ReadingTask.prototype.read(Iterable<Uint8Array>)", async () => {
+Deno.test("new BytesStream.ReadingTask(Iterable<Uint8Array>)", async () => {
   const task1 = BytesStream.ReadingTask.create([
     Uint8Array.of(1),
     Uint8Array.of(2, 3),
@@ -113,7 +113,7 @@ Deno.test("BytesStream.ReadingTask.prototype.read(Iterable<Uint8Array>)", async 
   assertStrictEquals(bs2.byteLength, 0);
 });
 
-Deno.test("BytesStream.ReadingTask.prototype.read(Iterable<*>)", async () => {
+Deno.test("new BytesStream.ReadingTask(Iterable<*>)", async () => {
   try {
     const task1 = BytesStream.ReadingTask.create(
       [3] as unknown as Iterable<Uint8Array>,
@@ -127,7 +127,7 @@ Deno.test("BytesStream.ReadingTask.prototype.read(Iterable<*>)", async () => {
   }
 });
 
-Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream, {totalByteLength: number})", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream, {totalByteLength: number})", async () => {
   const s1 = createStream(8);
   const task1 = BytesStream.ReadingTask.create(s1, { totalByteLength: 8 });
   const bs1 = await task1.run();
@@ -161,7 +161,7 @@ Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream, {totalByteLeng
   assertStrictEquals(bs5.buffer.byteLength, 8);
 });
 
-Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream, {totalByteLength:number}) - error", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream, {totalByteLength:number}) - error", async () => {
   try {
     const task1 = BytesStream.ReadingTask.create([], { totalByteLength: -1 });
     await task1.run();
@@ -185,7 +185,7 @@ Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream, {totalByteLeng
   }
 });
 
-Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream, {signal:AbortSignal})", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream, {signal:AbortSignal})", async () => {
   const s1 = createStream(100);
   const ac1 = new AbortController();
   try {
@@ -201,7 +201,7 @@ Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream, {signal:AbortS
   }
 });
 
-Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream, {signal:AbortSignal}) - error", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream, {signal:AbortSignal}) - error", async () => {
   const s2 = createStream(100);
   try {
     const reader2 = BytesStream.ReadingTask.create(s2, {
@@ -215,7 +215,7 @@ Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream, {signal:AbortS
   }
 });
 
-Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream, {signal:AbortSignal}) - error", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream, {signal:AbortSignal}) - abort", async () => {
   const s2 = createStream(100);
   const ac2 = new AbortController();
   ac2.abort();
@@ -230,7 +230,7 @@ Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream, {signal:AbortS
   }
 });
 
-Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream)/addEventListener()", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.onprogress", async () => {
   const s1 = createStream(8);
   const task1 = BytesStream.ReadingTask.create(s1);
 
@@ -268,7 +268,7 @@ Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream)/addEventListen
   // assertStrictEquals(names.filter((n) => n === "loadend").length, 1);
 });
 
-Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream)/addEventListener() - total", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.onprogress - total", async () => {
   const s1 = createStream(8);
   const task1 = BytesStream.ReadingTask.create(s1, { totalByteLength: 200 });
 
@@ -306,7 +306,7 @@ Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream)/addEventListen
   // assertStrictEquals(names.filter((n) => n === "loadend").length, 1);
 });
 
-Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream)/addEventListener() - abort", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.onprogress - abort", async () => {
   const s1 = createStream(8);
   const ac1 = new AbortController();
   const task1 = BytesStream.ReadingTask.create(s1, { signal: ac1.signal });
@@ -352,4 +352,37 @@ Deno.test("BytesStream.ReadingTask.prototype.read(ReadableStream)/addEventListen
   // assertStrictEquals(names.filter((n) => n === "loadend").length, 1);
 });
 
-//TODO "error"
+//TODO "new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.onprogress - error"
+
+Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.state", async () => {
+  const s1 = createStream(80);
+  const task1 = BytesStream.ReadingTask.create(s1);
+
+  assertStrictEquals(task1.state, "ready");
+
+  const tasks = [task1.run()];
+  assertStrictEquals(task1.state, "running");
+  const bs1 = await Promise.all(tasks);
+  assertStrictEquals(bs1[0].byteLength, 80);
+  assertStrictEquals(task1.state, "completed");
+
+});
+
+Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.state - abort", async () => {
+  const s1 = createStream(100);
+  const ac1 = new AbortController();
+  const task1 = BytesStream.ReadingTask.create(s1, { signal: ac1.signal });
+  try {
+    setTimeout(() => {
+      ac1.abort();
+    }, 5);
+    await task1.run();
+    throw new Error();
+  } catch (e) {
+    const err = e as Error;
+    assertStrictEquals(err.name, "AbortError");
+    assertStrictEquals(task1.state, "aborted");
+  }
+});
+
+//TODO "new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.state - error"
