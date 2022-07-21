@@ -42,8 +42,6 @@ async function* _streamToAsyncGenerator<T>(
 //   state: Task.State;
 //   progress: Task.Progress;
 //   run: () => Promise<T>;
-//   onstatechange?: () => void;
-//   onprogress?: () => void;
 // }
 
 /**
@@ -89,18 +87,10 @@ namespace Task {
 //   }
 // }
 
-/**
- * @internal
- */
-type _ProgressChangeListener =
-  | ((event: ProgressEvent) => void)
-  | undefined;
-
 type _Internal = {
   state: Task.State;
   loadedByteLength: int;
   lastProgressNotifiedAt: number;
-  onprogress: _ProgressChangeListener;
 };
 
 /**
@@ -142,7 +132,8 @@ namespace BytesStream {
   /**
    * @experimental
    */
-  export class ReadingTask /* extends EventTarget implements Task<Uint8Array> */ {
+  export class ReadingTask
+    extends EventTarget /* implements Task<Uint8Array> */ {
     #stream: Source;
     #totalByteLength: int;
     #indeterminate: boolean;
@@ -158,7 +149,7 @@ namespace BytesStream {
         throw new TypeError("stream");
       }
 
-      // super();
+      super();
       this.#stream = stream;
 
       const totalByteLength: number | undefined = options?.totalByteLength;
@@ -194,7 +185,6 @@ namespace BytesStream {
         state: Task.State.READY,
         loadedByteLength: 0,
         lastProgressNotifiedAt: Number.MIN_VALUE,
-        onprogress: undefined,
       });
       Object.freeze(this);
     }
@@ -216,17 +206,6 @@ namespace BytesStream {
     //   return _translateState(this.#internal.state);
     // }
 
-    set onprogress(value: _ProgressChangeListener) {
-      this.#internal.onprogress = value;
-    }
-
-    #onprogress(progress: ProgressEvent): void {
-      if (typeof this.#internal.onprogress !== "function") {
-        return;
-      }
-      this.#internal.onprogress(progress);
-    }
-
     #notify(name: string): void {
       if (name === "progress") {
         const now = globalThis.performance.now();
@@ -237,10 +216,7 @@ namespace BytesStream {
       }
 
       const event = new _ProgressEvent(name, this.progress);
-      if (name === "progress") {
-        this.#onprogress(event);
-      }
-      // this.dispatchEvent(event);
+      this.dispatchEvent(event);
     }
 
     async run(): Promise<Uint8Array> {
@@ -311,7 +287,7 @@ namespace BytesStream {
 
       try {
         // started
-        this.#notify("loadstart"); //XXX 不要では
+        this.#notify("loadstart");
 
         for await (const chunk of asyncSource) {
           if (this.#signal?.aborted === true) {
@@ -361,7 +337,7 @@ namespace BytesStream {
         // // signalに追加したリスナーを削除
         // this.#abortController.abort();
 
-        this.#notify("loadend"); //XXX 不要では
+        this.#notify("loadend"); // "progress"は間引く可能性があるので、最終的にloadedがいくつなのかは"progress"ではわからない
       }
     }
   }
