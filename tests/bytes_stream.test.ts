@@ -127,61 +127,61 @@ Deno.test("new BytesStream.ReadingTask(Iterable<*>)", async () => {
   }
 });
 
-Deno.test("new BytesStream.ReadingTask(ReadableStream, {totalByteLength: number})", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream, {total: number})", async () => {
   const s1 = createStream(8);
-  const task1 = BytesStream.ReadingTask.create(s1, { totalByteLength: 8 });
+  const task1 = BytesStream.ReadingTask.create(s1, { total: 8 });
   const bs1 = await task1.run();
   assertStrictEquals(bs1.byteLength, 8);
   assertStrictEquals(bs1.buffer.byteLength, 8);
 
   const s2 = createStream(8);
-  const reader2 = BytesStream.ReadingTask.create(s2, { totalByteLength: 9 });
+  const reader2 = BytesStream.ReadingTask.create(s2, { total: 9 });
   const bs2 = await reader2.run();
   assertStrictEquals(bs2.byteLength, 8);
   assertStrictEquals(bs2.buffer.byteLength, 8);
 
   const s3 = createStream(8);
-  const reader3 = BytesStream.ReadingTask.create(s3, { totalByteLength: 7 });
+  const reader3 = BytesStream.ReadingTask.create(s3, { total: 7 });
   const bs3 = await reader3.run();
   assertStrictEquals(bs3.byteLength, 8);
   assertStrictEquals(bs3.buffer.byteLength, 8);
 
   const s4 = createStream(8);
-  const reader4 = BytesStream.ReadingTask.create(s4, { totalByteLength: 0 });
+  const reader4 = BytesStream.ReadingTask.create(s4, { total: 0 });
   const bs4 = await reader4.run();
   assertStrictEquals(bs4.byteLength, 8);
   assertStrictEquals(bs4.buffer.byteLength, 8);
 
   const s5 = createStream(8);
   const reader5 = BytesStream.ReadingTask.create(s5, {
-    totalByteLength: undefined,
+    total: undefined,
   });
   const bs5 = await reader5.run();
   assertStrictEquals(bs5.byteLength, 8);
   assertStrictEquals(bs5.buffer.byteLength, 8);
 });
 
-Deno.test("new BytesStream.ReadingTask(ReadableStream, {totalByteLength:number}) - error", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream, {total:number}) - error", async () => {
   try {
-    const task1 = BytesStream.ReadingTask.create([], { totalByteLength: -1 });
+    const task1 = BytesStream.ReadingTask.create([], { total: -1 });
     await task1.run();
     throw new Error();
   } catch (e) {
     const err = e as Error;
     assertStrictEquals(err.name, "RangeError");
-    assertStrictEquals(err.message, "options.totalByteLength");
+    assertStrictEquals(err.message, "options.total");
   }
 
   try {
     const reader2 = BytesStream.ReadingTask.create([], {
-      totalByteLength: "1" as unknown as number,
+      total: "1" as unknown as number,
     });
     await reader2.run();
     throw new Error();
   } catch (e) {
     const err = e as Error;
     assertStrictEquals(err.name, "TypeError");
-    assertStrictEquals(err.message, "options.totalByteLength");
+    assertStrictEquals(err.message, "options.total");
   }
 });
 
@@ -269,7 +269,7 @@ Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask
 
 Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.addEventListener() - total", async () => {
   const s1 = createStream(8);
-  const task1 = BytesStream.ReadingTask.create(s1, { totalByteLength: 200 });
+  const task1 = BytesStream.ReadingTask.create(s1, { total: 200 });
 
   let loadedLength = -1;
   let totalLength = -1;
@@ -403,7 +403,7 @@ Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask
 
 Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.progress", async () => {
   const s1 = createStream(80);
-  const task1 = BytesStream.ReadingTask.create(s1, { totalByteLength: 80 });
+  const task1 = BytesStream.ReadingTask.create(s1, { total: 80 });
   const p1 = task1.progress;
 
   assertStrictEquals(p1.total, 80);
