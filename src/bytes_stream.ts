@@ -1,5 +1,3 @@
-//
-
 import { AbortError, InvalidStateError, Reading } from "./deps.ts";
 import { _BytesBuffer } from "./bytes_buffer.ts";
 

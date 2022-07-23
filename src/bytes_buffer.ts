@@ -1,4 +1,4 @@
-//
+type int = number;
 
 const DEFAULT_SIZE = 1_048_576;
 
@@ -6,20 +6,20 @@ const DEFAULT_SIZE = 1_048_576;
  * @internal
  */
 class _BytesBuffer {
-  #position: number;
+  #position: int;
   #buffer: Uint8Array;
 
-  constructor(size: number = DEFAULT_SIZE) {
+  constructor(size: int = DEFAULT_SIZE) {
     this.#position = 0;
     this.#buffer = new Uint8Array(size);
     Object.seal(this);
   }
 
-  get capacity(): number {
+  get capacity(): int {
     return this.#buffer.byteLength;
   }
 
-  get position(): number {
+  get position(): int {
     return this.#position;
   }
 
@@ -36,11 +36,11 @@ class _BytesBuffer {
     this.#position = this.#position + bytes.byteLength;
   }
 
-  subarray(begin = 0, end: number = this.#position): Uint8Array {
+  subarray(begin = 0, end: int = this.#position): Uint8Array {
     return this.#buffer.subarray(begin, end);
   }
 
-  slice(begin = 0, end: number = this.#position): Uint8Array {
+  slice(begin = 0, end: int = this.#position): Uint8Array {
     return this.#buffer.slice(begin, end);
   }
 }
