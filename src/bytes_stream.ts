@@ -1,4 +1,5 @@
-import { AbortError, InvalidStateError, Reading } from "./deps.ts";
+import { AbortError, InvalidStateError } from "i-xi-dev/exception.es";
+import { Reading } from "i-xi-dev/reading.es";
 import { _BytesBuffer } from "./bytes_buffer.ts";
 
 /**
