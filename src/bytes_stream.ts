@@ -54,8 +54,6 @@ namespace BytesStream {
 
   /**
    * The [`ReadableStream`](https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream) of `Uint8Array` or the async iterator of `Uint8Array`.
-   *
-   * @experimental
    */
   export type Source =
     | AsyncIterable<Uint8Array>
@@ -64,12 +62,15 @@ namespace BytesStream {
   // XXX ReadableStream<Uint8Array>は、そのうちAsyncIterable<Uint8Array>になる
 
   /**
-   * @experimental
+   * The byte stream reading task.
    */
   export class ReadingTask extends Reading.Task<Uint8Array> {
     readonly #stream: Source;
-    // readonly #abortController: AbortController;
 
+    /**
+     * @param stream - The byte stream.
+     * @param options - The reading options.
+     */
     private constructor(stream: Source, options?: Reading.Options) {
       if (stream && (typeof stream === "object")) {
         // ok
@@ -81,13 +82,16 @@ namespace BytesStream {
       this.#stream = stream;
       // this.#abortController = new AbortController();
 
-      Object.freeze(this);
+      Object.seal(this);
     }
 
     static create(stream: Source, options?: Reading.Options): ReadingTask {
       return new ReadingTask(stream, options);
     }
 
+    /**
+     * @returns The `Promise` that fulfills with a read byte sequence.
+     */
     override async run(): Promise<Uint8Array> {
       if (
         Reflect.has(this.#stream, Symbol.asyncIterator) ||
@@ -124,10 +128,10 @@ namespace BytesStream {
     async #readAsyncIterable(
       asyncSource: AsyncIterable<Uint8Array>,
     ): Promise<Uint8Array> {
-      if (this._internal.state !== Reading.State.READY) {
-        throw new InvalidStateError(`state is not READY`);
+      if (this.status !== Reading.Status.READY) {
+        throw new InvalidStateError(`status is not READY`);
       }
-      this._internal.state = Reading.State.RUNNING;
+      this._status = Reading.Status.RUNNING;
 
       if (this._signal instanceof AbortSignal) {
         // // ストリームの最後の読み取りがキューされるまでに中止通達されれば中断する
@@ -151,12 +155,12 @@ namespace BytesStream {
       }
 
       const buffer: _BytesBuffer = new _BytesBuffer(
-        (this._indeterminate === true) ? undefined : this._total,
+        (this.indeterminate === true) ? undefined : this.total,
       );
 
       try {
         // started
-        this._notify("loadstart");
+        this._notifyProgress("loadstart");
 
         for await (const chunk of asyncSource) {
           if (this._signal?.aborted === true) {
@@ -166,16 +170,16 @@ namespace BytesStream {
 
           if (chunk instanceof Uint8Array) {
             buffer.put(chunk);
-            this._internal.loaded = buffer.position;
-            this._notify("progress");
+            this._loaded = buffer.position;
+            this._notifyProgress("progress");
           } else {
             throw new TypeError("asyncSource");
           }
         }
 
         // completed
-        this._internal.state = Reading.State.COMPLETED;
-        // this._notify("load"); resolveされるのでわかる
+        this._status = Reading.Status.COMPLETED;
+        // this._notifyProgress("load"); resolveされるのでわかる
 
         if (buffer.capacity !== buffer.position) {
           return buffer.slice();
@@ -186,27 +190,27 @@ namespace BytesStream {
         if ((exception instanceof Error) && (exception.name === "AbortError")) {
           // ・呼び出し側のAbortControllerでreason省略でabortした場合
           // ・呼び出し側のAbortControllerでreason:AbortErrorでabortした場合
-          this._internal.state = Reading.State.ABORTED;
-          // this._notify("abort"); rejectされるのでわかる
+          this._status = Reading.Status.ABORTED;
+          // this._notifyProgress("abort"); rejectされるのでわかる
         } else if (
           (exception instanceof Error) && (exception.name === "TimeoutError")
         ) {
           // ・AbortSignal.timeoutでabortされた場合
           // ・呼び出し側のAbortControllerでreason:TimeoutErrorでabortした場合
-          this._internal.state = Reading.State.ABORTED; //TODO timeout独自のstateにする？
-          // this._notify("timeout"); rejectされるのでわかる
+          this._status = Reading.Status.ABORTED; //TODO timeout独自のstateにする？
+          // this._notifyProgress("timeout"); rejectされるのでわかる
         } else {
           // ・呼び出し側のAbortControllerでreason:AbortError,TimeoutError以外でabortした場合
           // ・その他のエラー
-          this._internal.state = Reading.State.ERROR;
-          // this._notify("error"); rejectされるのでわかる
+          this._status = Reading.Status.ERROR;
+          // this._notifyProgress("error"); rejectされるのでわかる
         }
         throw exception;
       } finally {
         // // signalに追加したリスナーを削除
         // this.#abortController.abort();
 
-        this._notify("loadend"); // "progress"は間引く可能性があるので、最終的にloadedがいくつなのかは"progress"ではわからない
+        this._notifyProgress("loadend"); // "progress"は間引く可能性があるので、最終的にloadedがいくつなのかは"progress"ではわからない
       }
     }
   }

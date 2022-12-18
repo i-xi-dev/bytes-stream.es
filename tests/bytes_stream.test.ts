@@ -46,7 +46,7 @@ Deno.test("new BytesStream.ReadingTask(ReadableStream)", async () => {
   } catch (e) {
     const err = e as Error;
     assertStrictEquals(err.name, "InvalidStateError");
-    assertStrictEquals(err.message, "state is not READY");
+    assertStrictEquals(err.message, "status is not READY");
   }
 });
 
@@ -351,20 +351,20 @@ Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask
 
 //TODO "new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.addEventListener() - error"
 
-Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.state", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.status", async () => {
   const s1 = createStream(80);
   const task1 = BytesStream.ReadingTask.create(s1);
 
-  assertStrictEquals(task1.state, "ready");
+  assertStrictEquals(task1.status, "ready");
 
   const tasks = [task1.run()];
-  assertStrictEquals(task1.state, "running");
+  assertStrictEquals(task1.status, "running");
   const bs1 = await Promise.all(tasks);
   assertStrictEquals(bs1[0].byteLength, 80);
-  assertStrictEquals(task1.state, "completed");
+  assertStrictEquals(task1.status, "completed");
 });
 
-Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.state - abort", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.status - abort", async () => {
   const s1 = createStream(100);
   const ac1 = new AbortController();
   const task1 = BytesStream.ReadingTask.create(s1, { signal: ac1.signal });
@@ -377,49 +377,47 @@ Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask
   } catch (e) {
     const err = e as Error;
     assertStrictEquals(err.name, "AbortError");
-    assertStrictEquals(task1.state, "aborted");
+    assertStrictEquals(task1.status, "aborted");
   }
 });
 
-//TODO "new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.state - error"
+//TODO "new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.status - error"
 
-Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.progress", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.loaded/total/indetrminate", async () => {
   const s1 = createStream(80);
   const task1 = BytesStream.ReadingTask.create(s1);
-  const p1 = task1.progress;
 
-  assertStrictEquals(p1.total, 0);
-  assertStrictEquals(p1.loaded, 0);
-  assertStrictEquals(p1.lengthComputable, false);
+  assertStrictEquals(task1.total, 0);
+  assertStrictEquals(task1.loaded, 0);
+  assertStrictEquals(task1.indeterminate, true);
 
   const tasks = [task1.run()];
   const bs1 = await Promise.all(tasks);
   assertStrictEquals(bs1[0].byteLength, 80);
 
-  assertStrictEquals(p1.total, 0);
-  assertStrictEquals(p1.loaded, 80);
-  assertStrictEquals(p1.lengthComputable, false);
+  assertStrictEquals(task1.total, 0);
+  assertStrictEquals(task1.loaded, 80);
+  assertStrictEquals(task1.indeterminate, true);
 });
 
-Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.progress", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.loaded/total/indetrminate", async () => {
   const s1 = createStream(80);
   const task1 = BytesStream.ReadingTask.create(s1, { total: 80 });
-  const p1 = task1.progress;
 
-  assertStrictEquals(p1.total, 80);
-  assertStrictEquals(p1.loaded, 0);
-  assertStrictEquals(p1.lengthComputable, true);
+  assertStrictEquals(task1.total, 80);
+  assertStrictEquals(task1.loaded, 0);
+  assertStrictEquals(task1.indeterminate, false);
 
   const tasks = [task1.run()];
   const bs1 = await Promise.all(tasks);
   assertStrictEquals(bs1[0].byteLength, 80);
 
-  assertStrictEquals(p1.total, 80);
-  assertStrictEquals(p1.loaded, 80);
-  assertStrictEquals(p1.lengthComputable, true);
+  assertStrictEquals(task1.total, 80);
+  assertStrictEquals(task1.loaded, 80);
+  assertStrictEquals(task1.indeterminate, false);
 });
 
-Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.progress - abort", async () => {
+Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.loaded/total/indetrminate - abort", async () => {
   const s1 = createStream(100);
   const ac1 = new AbortController();
   const task1 = BytesStream.ReadingTask.create(s1, { signal: ac1.signal });
@@ -432,8 +430,8 @@ Deno.test("new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask
   } catch (e) {
     const err = e as Error;
     assertStrictEquals(err.name, "AbortError");
-    assertStrictEquals(task1.progress.loaded >= 0, true);
+    assertStrictEquals(task1.loaded >= 0, true);
   }
 });
 
-//TODO "new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.progress - error"
+//TODO "new BytesStream.ReadingTask(ReadableStream) / BytesStream.ReadingTask.prototype.loaded/total/indetrminate - error"
