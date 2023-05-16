@@ -1,4 +1,4 @@
-import { assertNotStrictEquals, assertStrictEquals } from "std/testing/asserts";
+import { assertNotStrictEquals, assertStrictEquals } from "./deps.ts";
 import { _BytesBuffer } from "../src/bytes_buffer.ts";
 
 Deno.test("new _BytesBuffer()/capacity/position/put()", () => {

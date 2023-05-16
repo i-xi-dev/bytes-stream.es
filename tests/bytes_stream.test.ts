@@ -1,4 +1,4 @@
-import { assertStrictEquals } from "std/testing/asserts";
+import { assertStrictEquals } from "./deps.ts";
 import { BytesStream } from "../mod.ts";
 
 // function wait(ms: number) {
