@@ -8,11 +8,6 @@
   "fmt": {
   },
   "compilerOptions": {
-    "removeComments": true,
-    "strict": true //,
-    // "noUncheckedIndexedAccess": true, → trueにすると、"deno test"でstd/testingでエラーになる
-    // "noImplicitOverride": true, → trueにすると、dntでエラーになる
-    // "noPropertyAccessFromIndexSignature": true → trueにすると、dntでエラーになる
   },
   "tasks": {
     "test": "deno test tests/"
