@@ -23,8 +23,7 @@ async function* _streamToAsyncGenerator<T>(
   } catch (exception) {
     void exception; // XXX
     return;
-  }
-  finally {
+  } finally {
     streamReader.releaseLock();
   }
 }

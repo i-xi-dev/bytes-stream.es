@@ -1,1 +1,4 @@
-export { assertNotStrictEquals, assertStrictEquals } from "https://deno.land/std@0.190.0/testing/asserts.ts";
+export {
+  assertNotStrictEquals,
+  assertStrictEquals,
+} from "https://deno.land/std@0.194.0/testing/asserts.ts";
