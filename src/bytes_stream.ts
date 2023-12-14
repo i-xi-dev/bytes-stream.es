@@ -215,8 +215,6 @@ namespace BytesStream {
       }
     }
   }
-  Object.freeze(ReadingTask);
 }
-Object.freeze(BytesStream);
 
 export { BytesStream };

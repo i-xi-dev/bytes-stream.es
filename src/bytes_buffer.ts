@@ -44,6 +44,5 @@ class _BytesBuffer {
     return this.#buffer.slice(begin, end);
   }
 }
-Object.freeze(_BytesBuffer);
 
 export { _BytesBuffer };
