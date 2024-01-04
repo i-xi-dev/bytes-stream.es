@@ -1,5 +1,11 @@
-import { AbortError, InvalidStateError, Reading } from "../deps.ts";
-import { _BytesBuffer } from "./bytes_buffer.ts";
+import {
+  AbortError,
+  GrowableBuffer,
+  InvalidStateError,
+  Reading,
+} from "../deps.ts";
+
+//TODO GrowableBuffer import
 
 /**
  * 可読ストリームを読み取り、チャンクを返却する非同期ジェネレーターを返却
@@ -31,7 +37,7 @@ async function* _streamToAsyncGenerator<T>(
 /**
  * @experimental
  */
-namespace BytesStream {
+export namespace BytesStream {
   // /**
   //  * The options for the `BytesStream.Reader` with the following optional fields.
   //  */
@@ -155,7 +161,7 @@ namespace BytesStream {
         throw new TypeError("options.signal");
       }
 
-      const buffer: _BytesBuffer = new _BytesBuffer(
+      const buffer: GrowableBuffer = new GrowableBuffer(
         (this.indeterminate === true) ? undefined : this.total,
       );
 
@@ -216,5 +222,3 @@ namespace BytesStream {
     }
   }
 }
-
-export { BytesStream };
