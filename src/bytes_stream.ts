@@ -176,7 +176,7 @@ export namespace BytesStream {
           }
 
           if (chunk instanceof Uint8Array) {
-            buffer.put(chunk);
+            buffer.putRange(chunk);
             this._loaded = buffer.position;
             this._notifyProgress("progress");
           } else {
