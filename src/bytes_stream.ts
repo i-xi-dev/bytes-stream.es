@@ -2,7 +2,7 @@ import {
   AbortError,
   GrowableBuffer,
   InvalidStateError,
-  Reading,
+  Loading,
 } from "../deps.ts";
 
 //TODO GrowableBuffer import
@@ -71,14 +71,14 @@ export namespace BytesStream {
   /**
    * The byte stream reading task.
    */
-  export class ReadingTask extends Reading.Task<Uint8Array> {
+  export class ReadingTask extends Loading.Task<Uint8Array> {
     readonly #stream: Source;
 
     /**
      * @param stream - The byte stream.
      * @param options - The reading options.
      */
-    private constructor(stream: Source, options?: Reading.Options) {
+    private constructor(stream: Source, options?: Loading.Options) {
       if (stream && (typeof stream === "object")) {
         // ok
       } else {
@@ -92,7 +92,7 @@ export namespace BytesStream {
       Object.seal(this);
     }
 
-    static create(stream: Source, options?: Reading.Options): ReadingTask {
+    static create(stream: Source, options?: Loading.Options): ReadingTask {
       return new ReadingTask(stream, options);
     }
 
@@ -135,10 +135,10 @@ export namespace BytesStream {
     async #readAsyncIterable(
       asyncSource: AsyncIterable<Uint8Array>,
     ): Promise<Uint8Array> {
-      if (this.status !== Reading.Status.READY) {
+      if (this.status !== Loading.Status.READY) {
         throw new InvalidStateError(`status is not READY`);
       }
-      this._status = Reading.Status.RUNNING;
+      this._status = Loading.Status.RUNNING;
 
       if (this._signal instanceof AbortSignal) {
         // // ストリームの最後の読み取りがキューされるまでに中止通達されれば中断する
@@ -185,7 +185,7 @@ export namespace BytesStream {
         }
 
         // completed
-        this._status = Reading.Status.COMPLETED;
+        this._status = Loading.Status.COMPLETED;
         // this._notifyProgress("load"); resolveされるのでわかる
 
         if (buffer.capacity !== buffer.position) {
@@ -197,19 +197,19 @@ export namespace BytesStream {
         if ((exception instanceof Error) && (exception.name === "AbortError")) {
           // ・呼び出し側のAbortControllerでreason省略でabortした場合
           // ・呼び出し側のAbortControllerでreason:AbortErrorでabortした場合
-          this._status = Reading.Status.ABORTED;
+          this._status = Loading.Status.ABORTED;
           // this._notifyProgress("abort"); rejectされるのでわかる
         } else if (
           (exception instanceof Error) && (exception.name === "TimeoutError")
         ) {
           // ・AbortSignal.timeoutでabortされた場合
           // ・呼び出し側のAbortControllerでreason:TimeoutErrorでabortした場合
-          this._status = Reading.Status.ABORTED; //TODO timeout独自のstateにする？
+          this._status = Loading.Status.ABORTED; //TODO timeout独自のstateにする？
           // this._notifyProgress("timeout"); rejectされるのでわかる
         } else {
           // ・呼び出し側のAbortControllerでreason:AbortError,TimeoutError以外でabortした場合
           // ・その他のエラー
-          this._status = Reading.Status.ERROR;
+          this._status = Loading.Status.ERROR;
           // this._notifyProgress("error"); rejectされるのでわかる
         }
         throw exception;
